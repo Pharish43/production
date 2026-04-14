@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soil Analysis XAI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #f2f7fb;
+            --surface: #ffffff;
+            --surface-strong: #eef6fc;
+            --text: #1f2937;
+            --muted: #667085;
+            --success: #0f766e;
+            --warning: #b45309;
+            --danger: #b91c1c;
+            --accent: #2563eb;
+            --border: rgba(148, 163, 184, 0.25);
+            --shadow: 0 28px 60px rgba(15, 23, 42, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at top left, #dbeafe 0%, #eff6ff 35%, #f8fafc 100%);
+            color: var(--text);
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 32px 0 64px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: clamp(2rem, 2.5vw, 2.75rem);
+            line-height: 1.05;
+        }
+
+        header p {
+            max-width: 680px;
+            margin: 16px 0 0;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .grid {
+            display: grid;
+            gap: 24px;
+            grid-template-columns: 1.5fr 1fr;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            padding: 28px;
+        }
+
+        .section-title {
+            margin: 0 0 16px;
+            color: var(--text);
+            font-size: 1.1rem;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 160px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            padding: 18px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+            font-size: 0.95rem;
+            resize: vertical;
+            color: var(--text);
+            background: #f8fbff;
+        }
+
+        .button-group,
+        .cta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        button,
+        .chip {
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button {
+            padding: 14px 20px;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            box-shadow: 0 18px 30px rgba(37, 99, 235, 0.18);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            background: #ffffff;
+            color: var(--text);
+            border: 1px solid var(--border);
+            box-shadow: none;
+        }
+
+        .status-card {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-top: 18px;
+        }
+
+        .result-card {
+            padding: 22px;
+            border-radius: 20px;
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            background: #f8fbff;
+        }
+
+        .result-title {
+            margin: 0;
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .badge.good { background: rgba(16, 185, 129, 0.12); color: #047857; }
+        .badge.medium { background: rgba(250, 204, 21, 0.14); color: #b45309; }
+        .badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+        .badge.water-needed { background: rgba(59, 130, 246, 0.15); color: #1d4ed8; }
+        .badge.no-water { background: rgba(16, 185, 129, 0.15); color: #047857; }
+
+        .grid-two {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .info-block,
+        .probability-list,
+        .validation-list {
+            background: var(--surface-strong);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid var(--border);
+        }
+
+        .info-block p,
+        .validation-list p,
+        .probability-list p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .probability-list ul,
+        .validation-list ul {
+            margin: 10px 0 0;
+            padding-left: 20px;
+            color: var(--text);
+        }
+
+        .note {
+            margin-top: 1rem;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+            line-height: 1.7;
+        }
+
+        @media (max-width: 930px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header>
+            <div>
+                <h1>Soil + Irrigation XAI Dashboard</h1>
+                <p>Run soil condition analysis and irrigation prediction together, then compare the results from both models in one interface.</p>
+            </div>
+        </header>
+
+        <div class="grid">
+            <section class="card">
+                <p class="section-title">Input soil values</p>
+                <label for="input">Enter 12 values in order: N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B (used by both soil analysis and irrigation prediction)</label>
+                <textarea id="input" rows="7">[270, 9.9, 444, 7.63, 0.40, 0.86, 11.8, 0.25, 0.76, 1.69, 2.43, 2.26]</textarea>
+
+                <div class="button-group">
+                    <button onclick="setExample('Good')">Example: Good</button>
+                    <button class="secondary" onclick="setExample('Medium')">Example: Medium</button>
+                    <button class="secondary" onclick="setExample('Bad')">Example: Bad</button>
+                </div>
+
+                <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                    <button class="secondary" onclick="predict()">Run combined soil + irrigation prediction</button>
+                </div>
+
+                <div class="info-block">
+                    <p>Tip: Use the provided examples to validate Good, Medium, and Bad soil conditions. The API includes medium-soil validation and detects inputs that are atypical for Medium classification.</p>
+                </div>
+            </section>
+
+            <section class="card">
+                <p class="section-title">Soil analysis summary</p>
+                <div class="result-card">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                        <div>
+                            <h2 class="result-title" id="result-title">Awaiting soil prediction</h2>
+                            <p id="result-subtitle" style="margin: 8px 0 0; color: var(--muted);">Enter soil values and click Predict.</p>
+                        </div>
+                        <span id="result-badge" class="badge good">Ready</span>
+                    </div>
+                </div>
+
+                <div class="grid-two" style="margin-top: 20px;">
+                    <div class="probability-list">
+                        <p><strong>Class probabilities</strong></p>
+                        <ul id="probability-list"><li>Prediction results will appear here.</li></ul>
+                    </div>
+                    <div class="validation-list">
+                        <p><strong>Validation</strong></p>
+                        <ul id="validation-list"><li>Validation details will appear here.</li></ul>
+                    </div>
+                </div>
+
+                <div id="model2-card" class="result-card" style="margin-top: 24px; background: rgba(56, 189, 248, 0.08); border-color: rgba(37, 99, 235, 0.18);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                        <div>
+                            <h3 class="result-title" style="font-size:1.05rem; margin-bottom: 6px;">Irrigation recommendation</h3>
+                            <p id="model2-result-title" style="margin: 0;">Awaiting irrigation recommendation.</p>
+                            <p id="model2-result-subtitle" style="margin: 8px 0 0; color: var(--muted);">This prediction comes from the irrigation model2 package.</p>
+                            <p id="model2-water-needed" style="margin: 8px 0 0; color: var(--muted); font-weight: 600;">Water recommendation will appear here.</p>
+                        </div>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <span id="model2-badge" class="badge medium">Ready</span>
+                            <span id="model2-water-badge" class="badge water-needed">Water needed</span>
+                        </div>
+                    </div>
+                    <div id="model2-probabilities" style="margin-top: 16px; color: var(--muted);">Model2 probabilities will appear here.</div>
+                </div>
+
+                <div style="margin-top: 24px;">
+                    <canvas id="chart" width="400" height="280"></canvas>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const examples = {
+            Good: [138, 8.6, 560, 7.46, 0.62, 0.7, 5.9, 0.24, 0.31, 0.77, 8.71, 0.11],
+            Medium: [182, 8.1, 507, 7.23, 0.73, 0.81, 10.2, 0.37, 2.19, 1.52, 2.75, 2.06],
+            Bad: [270, 9.9, 444, 7.63, 0.40, 0.86, 11.8, 0.25, 0.76, 1.69, 2.43, 2.26],
+        };
+
+        const badge = document.getElementById('result-badge');
+        const model2Badge = document.getElementById('model2-badge');
+        const model2WaterBadge = document.getElementById('model2-water-badge');
+        const model2Title = document.getElementById('model2-result-title');
+        const model2Subtitle = document.getElementById('model2-result-subtitle');
+        const model2WaterNeeded = document.getElementById('model2-water-needed');
+        const model2Probabilities = document.getElementById('model2-probabilities');
+        const chartElement = document.getElementById('chart');
+        let chart = null;
+
+        function setExample(type) {
+            document.getElementById('input').value = JSON.stringify(examples[type], null, 2);
+            document.getElementById('result-title').textContent = `Loaded ${type} example`;
+            document.getElementById('result-subtitle').textContent = 'Adjust the values or run the prediction directly.';
+            badge.textContent = 'Example';
+            badge.className = 'badge medium';
+        }
+
+        function formatLabelClass(label) {
+            if (label === 'Good') return 'badge good';
+            if (label === 'Medium') return 'badge medium';
+            if (label === 'Bad') return 'badge bad';
+            return 'badge medium';
+        }
+
+        async function predict() {
+            const rawText = document.getElementById('input').value;
+            let features;
+            try {
+                features = JSON.parse(rawText);
+            } catch (err) {
+                alert('Invalid JSON format. Use a JSON array of numbers.');
+                return;
+            }
+
+            const response = await fetch('/predict/combined', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ features }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                document.getElementById('result-title').textContent = 'Error';
+                document.getElementById('result-subtitle').textContent = result.error || response.statusText;
+                badge.textContent = 'Invalid';
+                badge.className = 'badge bad';
+                document.getElementById('probability-list').innerHTML = `<li>${result.error}</li>`;
+                document.getElementById('validation-list').innerHTML = '<li>Check input format or value ranges.</li>';
+                updateChart([], []);
+                model2Title.textContent = 'Irrigation prediction unavailable';
+                model2WaterNeeded.textContent = 'Water recommendation unavailable.';
+                model2Subtitle.textContent = 'The combined API request failed.';
+                model2Badge.textContent = 'Error';
+                model2Badge.className = 'badge bad';
+                model2WaterBadge.textContent = 'No recommendation';
+                model2WaterBadge.className = 'badge medium';
+                model2Probabilities.innerHTML = `<p>${result.error || 'Combined prediction failed.'}</p>`;
+                return;
+            }
+
+            const soil = result.soil || {};
+            const irrigation = result.irrigation || {};
+
+            document.getElementById('result-title').textContent = `Prediction: ${soil.prediction || 'Unknown'}`;
+            document.getElementById('result-subtitle').textContent = soil.advice || 'Review the feature impacts below.';
+            badge.textContent = soil.prediction || 'Unknown';
+            badge.className = formatLabelClass(soil.prediction);
+            document.getElementById('probability-list').innerHTML = soil.probabilities
+                ? soil.probabilities.map((p, index) => `<li>${['Good', 'Bad', 'Medium'][index]}: ${(p * 100).toFixed(1)}%</li>`).join('')
+                : '<li>No probability data available.</li>';
+            const validation = soil.validation || { message: 'No validation returned.', issues: [] };
+            document.getElementById('validation-list').innerHTML = `
+                <li>${validation.message}</li>
+                ${validation.issues.map(issue => `<li>${issue}</li>`).join('')}
+            `;
+            const labels = soil.explanation ? Object.keys(soil.explanation) : [];
+            const values = soil.explanation ? Object.values(soil.explanation) : [];
+            updateChart(labels, values);
+
+            if (irrigation.error) {
+                model2Title.textContent = 'Irrigation error';
+                model2WaterNeeded.textContent = irrigation.error;
+                model2Subtitle.textContent = 'Irrigation prediction failed.';
+                model2Badge.textContent = 'Error';
+                model2Badge.className = 'badge bad';
+                model2WaterBadge.textContent = 'No recommendation';
+                model2WaterBadge.className = 'badge medium';
+                model2Probabilities.innerHTML = `<p>${irrigation.error}</p>`;
+            } else {
+                model2Title.textContent = `Prediction: ${irrigation.prediction || 'Unknown'}`;
+                model2Subtitle.textContent = irrigation.advice || 'Irrigation prediction result.';
+                const waterText = irrigation.water_needed || 'Water recommendation unavailable.';
+                model2WaterNeeded.textContent = waterText;
+                model2Badge.textContent = irrigation.prediction || 'Unknown';
+                model2Badge.className = formatLabelClass(irrigation.prediction);
+                if (waterText.toLowerCase().includes('water needed')) {
+                    model2WaterBadge.textContent = 'Water needed';
+                    model2WaterBadge.className = 'badge water-needed';
+                } else if (waterText.toLowerCase().includes('no water')) {
+                    model2WaterBadge.textContent = 'No water needed';
+                    model2WaterBadge.className = 'badge no-water';
+                } else {
+                    model2WaterBadge.textContent = waterText;
+                    model2WaterBadge.className = 'badge medium';
+                }
+                model2Probabilities.innerHTML = irrigation.probabilities
+                    ? `<ul>${irrigation.probabilities.map((p, index) => `<li>${['Good', 'Bad', 'Medium'][index]}: ${(p * 100).toFixed(1)}%</li>`).join('')}</ul>`
+                    : '<p>No probability data available.</p>';
+            }
+        }
+
+        function updateChart(labels, values) {
+            if (chart) {
+                chart.destroy();
+            }
+            if (!labels.length) {
+                chartElement.style.display = 'none';
+                return;
+            }
+            chartElement.style.display = 'block';
+            chart = new Chart(chartElement, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Feature impact',
+                        data: values,
+                        backgroundColor: values.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.75)' : 'rgba(239, 68, 68, 0.75)'),
+                        borderRadius: 10,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#475569' },
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(148, 163, 184, 0.15)' },
+                            ticks: { color: '#475569' },
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
