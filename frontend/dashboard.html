@@ -232,8 +232,9 @@
         <div class="grid">
             <section class="card">
                 <p class="section-title">Input soil values</p>
-                <label for="input">Enter 12 values in order: N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B (used by both soil analysis and irrigation prediction)</label>
+                <label for="input">Enter 12 values in order: N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B (soil analysis only; irrigation model2 requires a separate 26-feature input).</label>
                 <textarea id="input" rows="7">[270, 9.9, 444, 7.63, 0.40, 0.86, 11.8, 0.25, 0.76, 1.69, 2.43, 2.26]</textarea>
+                <p style="margin-top: 10px; color: var(--muted); font-size: 0.95rem;">Note: the current irrigation production model expects a 26-value preprocessed feature vector, so this dashboard input is currently valid only for soil prediction.</p>
 
                 <div class="button-group">
                     <button onclick="setExample('Good')">Example: Good</button>

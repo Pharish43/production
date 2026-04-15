@@ -123,7 +123,7 @@ features = numpy.array([[...]], dtype=float)
 prediction, probabilities = predict(features)
 ```
 
-> `model2` expects a pre-scaled feature vector of 26 values for its production workflow.
+> `model2` expects a preprocessed numeric feature vector of 26 values for its production workflow.
 
 ## Input Format
 

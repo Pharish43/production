@@ -53,6 +53,45 @@ MEDIUM_CLASS_RANGES = {
     "B": (0.19, 2.12),
 }
 
+MODEL2_REQUIRED_CATEGORICALS = [
+    "Soil_Type",
+    "Crop_Type",
+    "Crop_Growth_Stage",
+    "Season",
+    "Irrigation_Type",
+    "Water_Source",
+    "Mulching_Used",
+    "Region",
+]
+
+MODEL2_OPTIONAL_NUMERIC_FIELDS = [
+    "Soil_pH",
+    "Soil_Moisture",
+    "Organic_Carbon",
+    "Electrical_Conductivity",
+    "Temperature_C",
+    "Humidity",
+    "Rainfall_mm",
+    "Sunlight_Hours",
+    "Wind_Speed_kmh",
+    "Field_Area_hectare",
+    "Previous_Irrigation_mm",
+]
+
+MODEL2_DEFAULT_NUMERIC_VALUES = {
+    "Soil_pH": 6.487857,
+    "Soil_Moisture": 36.969207,
+    "Organic_Carbon": 0.944731,
+    "Electrical_Conductivity": 1.791963,
+    "Temperature_C": 26.991423,
+    "Humidity": 60.080339,
+    "Rainfall_mm": 1252.49942,
+    "Sunlight_Hours": 7.518538,
+    "Wind_Speed_kmh": 10.163545,
+    "Field_Area_hectare": 7.598024,
+    "Previous_Irrigation_mm": 59.864122,
+}
+
 def _to_python_scalar(value):
     if isinstance(value, np.generic):
         return value.item()
@@ -111,16 +150,82 @@ def _load_model2():
     return model2_model, model2_scaler, model2_encoder
 
 
+def _build_model2_feature_array(features, model2_encoder):
+    if isinstance(features, list):
+        if len(features) != 26:
+            return None, f"Model2 prediction failed: a raw feature list must contain 26 values, got {len(features)}."
+        try:
+            return np.array([features], dtype=float), None
+        except ValueError:
+            return None, "All feature values must be numeric."
+
+    if not isinstance(features, dict):
+        return None, "Model2 prediction requires either a 26-value list or a feature object with the required categorical fields."
+
+    missing = [
+        k for k in MODEL2_REQUIRED_CATEGORICALS if k not in features or features[k] is None
+    ]
+    if missing:
+        return None, f"Missing required model2 categorical fields: {', '.join(missing)}."
+
+    try:
+        soil_type = features["Soil_Type"]
+        soil_classes = list(model2_encoder["Soil_Type"].classes_)
+        if soil_type not in soil_classes:
+            raise ValueError(f"Unknown Soil_Type: {soil_type}")
+        soil_vector = [1.0 if soil_type == cls else 0.0 for cls in soil_classes]
+
+        region = features["Region"]
+        region_classes = list(model2_encoder["Region"].classes_)
+        if region not in region_classes:
+            raise ValueError(f"Unknown Region: {region}")
+        region_vector = [1.0 if region == cls else 0.0 for cls in region_classes]
+
+        crop_type = float(model2_encoder["Crop_Type"].transform([features["Crop_Type"]])[0])
+        growth_stage = float(model2_encoder["Crop_Growth_Stage"].transform([features["Crop_Growth_Stage"]])[0])
+        season = float(model2_encoder["Season"].transform([features["Season"]])[0])
+        irrigation_type = float(model2_encoder["Irrigation_Type"].transform([features["Irrigation_Type"]])[0])
+        water_source = float(model2_encoder["Water_Source"].transform([features["Water_Source"]])[0])
+        mulching_used = float(model2_encoder["Mulching_Used"].transform([features["Mulching_Used"]])[0])
+
+        numeric_values = []
+        for field in MODEL2_OPTIONAL_NUMERIC_FIELDS:
+            value = features.get(field, MODEL2_DEFAULT_NUMERIC_VALUES[field])
+            numeric_values.append(float(value))
+
+        feature_vector = (
+            soil_vector
+            + numeric_values
+            + [
+                crop_type,
+                growth_stage,
+                season,
+                irrigation_type,
+                water_source,
+                mulching_used,
+            ]
+            + region_vector
+        )
+
+        if len(feature_vector) != 26:
+            return None, f"Built model2 feature vector has wrong length {len(feature_vector)}; expected 26."
+
+        return np.array([feature_vector], dtype=float), None
+    except KeyError as exc:
+        return None, f"Model2 prediction failed: unknown categorical field {exc.args[0]}."
+    except ValueError as exc:
+        return None, f"Model2 prediction failed: {exc}"
+
+
 def _format_model2_response(features):
     try:
         model2_model, model2_scaler, model2_encoder = _load_model2()
     except Exception as exc:
         return None, None, None, str(exc)
 
-    try:
-        input_array = np.array([features], dtype=float)
-    except ValueError:
-        return None, None, None, "All feature values must be numeric."
+    input_array, error = _build_model2_feature_array(features, model2_encoder)
+    if error:
+        return None, None, None, error
 
     try:
         if hasattr(model2_scaler, 'n_features_in_') and input_array.shape[1] == model2_scaler.n_features_in_:
@@ -323,13 +428,8 @@ def predict_model2():
     payload = request.get_json(force=True)
     features = payload.get("features")
 
-    if not isinstance(features, list):
-        return jsonify({"error": "Request JSON must include 'features' as a list."}), 400
-
-    if len(features) != len(FEATURE_NAMES):
-        return jsonify({
-            "error": f"Expected {len(FEATURE_NAMES)} features, got {len(features)}."
-        }), 400
+    if not isinstance(features, (list, dict)):
+        return jsonify({"error": "Request JSON must include 'features' as a list or object."}), 400
 
     prediction, probabilities, label, error = _format_model2_response(features)
     if error:
@@ -338,15 +438,11 @@ def predict_model2():
     if isinstance(label, int) and label in CLASS_LABELS:
         label = CLASS_LABELS[label]
 
-    validation_report = None
-    if prediction[0] == 2:
-        validation_report = _validate_medium_soil(np.array([features], dtype=float))
-    else:
-        validation_report = {
-            "status": "ok",
-            "message": CLASS_FEEDBACK[prediction[0]],
-            "issues": [],
-        }
+    validation_report = {
+        "status": "ok",
+        "message": "Irrigation model2 processed the request successfully.",
+        "issues": [],
+    }
 
     response = {
         "prediction": label,
@@ -381,26 +477,17 @@ def predict_info():
     <body>
         <h1>Soil XAI Predict Endpoint</h1>
         <p>This endpoint accepts <strong>POST</strong> requests only.</p>
-        <p>Send a JSON body with <code>features</code> as a list of 12 numeric values in this order:</p>
-        <ol>
-            <li>N</li>
-            <li>P</li>
-            <li>K</li>
-            <li>pH</li>
-            <li>EC</li>
-            <li>OC</li>
-            <li>S</li>
-            <li>Zn</li>
-            <li>Fe</li>
-            <li>Cu</li>
-            <li>Mn</li>
-            <li>B</li>
-        </ol>
-        <p>Example request body:</p>
+        <p>Send a JSON body with <code>features</code> as a list of numeric values.</p>
+        <p>There are two supported prediction formats:</p>
+        <ul>
+            <li><code>/predict</code> and <code>/predict/combined</code>: 12 soil values in order <code>N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B</code>.</li>
+            <li><code>/predict/model2</code>: 26 numeric features for the irrigation production model.</li>
+        </ul>
+        <p>Example request body for the irrigation model:</p>
         <pre>{
-  "features": [270, 9.9, 444, 7.63, 0.40, 0.86, 11.8, 0.25, 0.76, 1.69, 2.43, 2.26]
+  "features": [0.0, 1.0, 0.5, 2.17, 21.9, 31.19, 1167.7, 4.01, 1.97, 1.0, 0.0, 4.0, 2.0, 0.0, 2.0, 4.73, 1.0, 1.98, 3.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
 }</pre>
-        <p>Use this route from the dashboard or any HTTP client.</p>
+        <p>Use this route from any HTTP client when calling the irrigation model directly.</p>
     </body>
     </html>
     """
