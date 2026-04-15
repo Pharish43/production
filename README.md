@@ -119,11 +119,11 @@ Or import it from the project root:
 from model2 import load_production_model, predict
 
 model, scaler, encoders = load_production_model()
-features = numpy.array([[...]], dtype=float)
+features = numpy.array([[0.0, 1.0, 0.0, 0.0, 6.5, 35.0, 1.0, 1.5, 28.0, 65.0, 800.0, 8.0, 10.0, 2.5, 50.0, 3.0, 3.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0]], dtype=float)
 prediction, probabilities = predict(features)
 ```
 
-> `model2` expects a preprocessed numeric feature vector of 26 values for its production workflow.
+> `model2` expects a preprocessed numeric feature vector of 26 values for its production workflow. The API endpoint `/predict/model2` can also accept a JSON object with categorical and numeric fields and will build the 26-value vector internally.
 
 ## Input Format
 

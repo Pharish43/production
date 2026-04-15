@@ -10,6 +10,9 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from xai_explainer import FEATURE_NAMES, load_artifacts, _create_shap_explainer
 from model2 import load_production_model as load_model2
+from model2.src.predict import explain_crop, predict_crop
+from model3.predict_crop import predict_crop as model3_predict_crop
+from model3.predict_crop import predict_crop as model3_predict_crop
 
 CLASS_LABELS = {
     0: "Good",
@@ -423,6 +426,33 @@ def predict_combined():
     })
 
 
+@app.route("/predict/model2/simple", methods=["POST"])
+def predict_model2_simple():
+    payload = request.get_json(force=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Request JSON must be an object with crop, soil, stage, moi, temp, humidity."}), 400
+
+    required_fields = ["crop", "soil", "stage", "moi", "temp", "humidity"]
+    missing_fields = [field for field in required_fields if field not in payload]
+    if missing_fields:
+        return jsonify({"error": f"Missing fields: {', '.join(missing_fields)}."}), 400
+
+    try:
+        explanation = predict_crop(
+            crop=payload["crop"],
+            soil=payload["soil"],
+            stage=payload["stage"],
+            moi=payload["moi"],
+            temp=payload["temp"],
+            humidity=payload["humidity"],
+            explain=True,
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify(explanation)
+
+
 @app.route("/predict/model2", methods=["POST"])
 def predict_model2():
     payload = request.get_json(force=True)
@@ -456,8 +486,44 @@ def predict_model2():
 
 
 @app.route("/", methods=["GET"])
+@app.route("/dashboard", methods=["GET"])
 def index():
     return send_from_directory(str(ROOT / 'frontend'), 'dashboard.html')
+
+
+@app.route("/model2-demo", methods=["GET"])
+def model2_demo():
+    return send_from_directory(str(ROOT / 'frontend'), 'model2_demo.html')
+
+
+@app.route("/model3", methods=["GET"])
+@app.route("/crop-recommendation", methods=["GET"])
+def model3_demo():
+    return send_from_directory(str(ROOT / 'frontend'), 'web_interface.html')
+
+
+@app.route("/model3/predict", methods=["POST"])
+def model3_predict():
+    payload = request.get_json(force=True)
+    required_fields = ['nitrogen', 'phosphorus', 'potassium', 'temperature', 'humidity', 'ph', 'rainfall']
+    missing_fields = [field for field in required_fields if field not in payload]
+    if missing_fields:
+        return jsonify({'error': f"Missing fields: {', '.join(missing_fields)}."}), 400
+
+    try:
+        crop, confidence = model3_predict_crop(
+            nitrogen=float(payload['nitrogen']),
+            phosphorus=float(payload['phosphorus']),
+            potassium=float(payload['potassium']),
+            temperature=float(payload['temperature']),
+            humidity=float(payload['humidity']),
+            ph=float(payload['ph']),
+            rainfall=float(payload['rainfall']),
+        )
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    return jsonify({'prediction': {'crop': crop, 'confidence': round(confidence, 2)}})
 
 
 @app.route("/predict", methods=["GET"])

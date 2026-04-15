@@ -1,0 +1,46 @@
+{
+  "columns": [
+    "crop ID",
+    "soil_type",
+    "Seedling Stage",
+    "MOI",
+    "temp",
+    "humidity"
+  ],
+  "target_values": [
+    0,
+    1,
+    2
+  ],
+  "crop_values": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "soil_values": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "stage_values": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "encoder_features": [
+    "crop ID",
+    "soil_type",
+    "Seedling Stage"
+  ]
+}

@@ -224,18 +224,16 @@
     <div class="page">
         <header>
             <div>
-                <h1>Soil + Irrigation XAI Dashboard</h1>
-                <p>Run soil condition analysis and irrigation prediction together, then compare the results from both models in one interface.</p>
+                <h1>Soil XAI Dashboard</h1>
+                <p>Run soil condition analysis and review the results from the soil model.</p>
             </div>
         </header>
 
         <div class="grid">
             <section class="card">
                 <p class="section-title">Input soil values</p>
-                <label for="input">Enter 12 values in order: N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B (soil analysis only; irrigation model2 requires a separate 26-feature input).</label>
+                <label for="input">Enter 12 values in order: N, P, K, pH, EC, OC, S, Zn, Fe, Cu, Mn, B.</label>
                 <textarea id="input" rows="7">[270, 9.9, 444, 7.63, 0.40, 0.86, 11.8, 0.25, 0.76, 1.69, 2.43, 2.26]</textarea>
-                <p style="margin-top: 10px; color: var(--muted); font-size: 0.95rem;">Note: the current irrigation production model expects a 26-value preprocessed feature vector, so this dashboard input is currently valid only for soil prediction.</p>
-
                 <div class="button-group">
                     <button onclick="setExample('Good')">Example: Good</button>
                     <button class="secondary" onclick="setExample('Medium')">Example: Medium</button>
@@ -243,7 +241,7 @@
                 </div>
 
                 <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                    <button class="secondary" onclick="predict()">Run combined soil + irrigation prediction</button>
+                    <button class="secondary" onclick="predict()">Run soil prediction</button>
                 </div>
 
                 <div class="info-block">
@@ -274,22 +272,6 @@
                     </div>
                 </div>
 
-                <div id="model2-card" class="result-card" style="margin-top: 24px; background: rgba(56, 189, 248, 0.08); border-color: rgba(37, 99, 235, 0.18);">
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
-                        <div>
-                            <h3 class="result-title" style="font-size:1.05rem; margin-bottom: 6px;">Irrigation recommendation</h3>
-                            <p id="model2-result-title" style="margin: 0;">Awaiting irrigation recommendation.</p>
-                            <p id="model2-result-subtitle" style="margin: 8px 0 0; color: var(--muted);">This prediction comes from the irrigation model2 package.</p>
-                            <p id="model2-water-needed" style="margin: 8px 0 0; color: var(--muted); font-weight: 600;">Water recommendation will appear here.</p>
-                        </div>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <span id="model2-badge" class="badge medium">Ready</span>
-                            <span id="model2-water-badge" class="badge water-needed">Water needed</span>
-                        </div>
-                    </div>
-                    <div id="model2-probabilities" style="margin-top: 16px; color: var(--muted);">Model2 probabilities will appear here.</div>
-                </div>
-
                 <div style="margin-top: 24px;">
                     <canvas id="chart" width="400" height="280"></canvas>
                 </div>
@@ -305,12 +287,6 @@
         };
 
         const badge = document.getElementById('result-badge');
-        const model2Badge = document.getElementById('model2-badge');
-        const model2WaterBadge = document.getElementById('model2-water-badge');
-        const model2Title = document.getElementById('model2-result-title');
-        const model2Subtitle = document.getElementById('model2-result-subtitle');
-        const model2WaterNeeded = document.getElementById('model2-water-needed');
-        const model2Probabilities = document.getElementById('model2-probabilities');
         const chartElement = document.getElementById('chart');
         let chart = null;
 
@@ -355,20 +331,10 @@
                 document.getElementById('probability-list').innerHTML = `<li>${result.error}</li>`;
                 document.getElementById('validation-list').innerHTML = '<li>Check input format or value ranges.</li>';
                 updateChart([], []);
-                model2Title.textContent = 'Irrigation prediction unavailable';
-                model2WaterNeeded.textContent = 'Water recommendation unavailable.';
-                model2Subtitle.textContent = 'The combined API request failed.';
-                model2Badge.textContent = 'Error';
-                model2Badge.className = 'badge bad';
-                model2WaterBadge.textContent = 'No recommendation';
-                model2WaterBadge.className = 'badge medium';
-                model2Probabilities.innerHTML = `<p>${result.error || 'Combined prediction failed.'}</p>`;
                 return;
             }
 
             const soil = result.soil || {};
-            const irrigation = result.irrigation || {};
-
             document.getElementById('result-title').textContent = `Prediction: ${soil.prediction || 'Unknown'}`;
             document.getElementById('result-subtitle').textContent = soil.advice || 'Review the feature impacts below.';
             badge.textContent = soil.prediction || 'Unknown';
@@ -384,37 +350,6 @@
             const labels = soil.explanation ? Object.keys(soil.explanation) : [];
             const values = soil.explanation ? Object.values(soil.explanation) : [];
             updateChart(labels, values);
-
-            if (irrigation.error) {
-                model2Title.textContent = 'Irrigation error';
-                model2WaterNeeded.textContent = irrigation.error;
-                model2Subtitle.textContent = 'Irrigation prediction failed.';
-                model2Badge.textContent = 'Error';
-                model2Badge.className = 'badge bad';
-                model2WaterBadge.textContent = 'No recommendation';
-                model2WaterBadge.className = 'badge medium';
-                model2Probabilities.innerHTML = `<p>${irrigation.error}</p>`;
-            } else {
-                model2Title.textContent = `Prediction: ${irrigation.prediction || 'Unknown'}`;
-                model2Subtitle.textContent = irrigation.advice || 'Irrigation prediction result.';
-                const waterText = irrigation.water_needed || 'Water recommendation unavailable.';
-                model2WaterNeeded.textContent = waterText;
-                model2Badge.textContent = irrigation.prediction || 'Unknown';
-                model2Badge.className = formatLabelClass(irrigation.prediction);
-                if (waterText.toLowerCase().includes('water needed')) {
-                    model2WaterBadge.textContent = 'Water needed';
-                    model2WaterBadge.className = 'badge water-needed';
-                } else if (waterText.toLowerCase().includes('no water')) {
-                    model2WaterBadge.textContent = 'No water needed';
-                    model2WaterBadge.className = 'badge no-water';
-                } else {
-                    model2WaterBadge.textContent = waterText;
-                    model2WaterBadge.className = 'badge medium';
-                }
-                model2Probabilities.innerHTML = irrigation.probabilities
-                    ? `<ul>${irrigation.probabilities.map((p, index) => `<li>${['Good', 'Bad', 'Medium'][index]}: ${(p * 100).toFixed(1)}%</li>`).join('')}</ul>`
-                    : '<p>No probability data available.</p>';
-            }
         }
 
         function updateChart(labels, values) {

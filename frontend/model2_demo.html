@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Model2 Irrigation Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 32px; color: #111827; background: #f8fafc; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { margin-bottom: 10px; }
+        .card { background: #ffffff; border: 1px solid #d1d5db; border-radius: 14px; padding: 22px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05); }
+        .button { display: inline-flex; align-items: center; justify-content: center; padding: 12px 18px; border-radius: 10px; border: none; cursor: pointer; background: #2563eb; color: white; font-weight: 600; transition: background .2s ease; }
+        .button:hover { background: #1d4ed8; }
+        pre { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; overflow-x: auto; }
+        .result-block { margin-top: 18px; }
+        .label { font-weight: 700; margin-top: 18px; display: block; }
+        .badge { display: inline-flex; align-items: center; gap: .4rem; padding: 8px 12px; border-radius: 999px; font-weight: 700; }
+        .badge.success { background: #d1fae5; color: #065f46; }
+        .badge.error { background: #fee2e2; color: #991b1b; }
+        .grid { display: grid; gap: 18px; margin-top: 22px; }
+        .message { margin-top: 14px; color: #4b5563; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Model2 Irrigation Demo</h1>
+        <p class="message">Use the custom input below and click the button to run a model2 prediction.</p>
+        <div class="card">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                <div>
+                    <p class="message">Paste or edit the 26-value feature vector below, then run the custom prediction.</p>
+                </div>
+            </div>
+
+            <div class="result-block" style="margin-top: 22px;">
+                <p class="label">Model2 prediction input</p>
+                <div class="grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+                    <div>
+                        <label class="label">Crop</label>
+                        <input id="crop" type="text" value="Wheat" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                    <div>
+                        <label class="label">Soil type</label>
+                        <input id="soil" type="text" value="Black Soil" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                    <div>
+                        <label class="label">Growth stage</label>
+                        <input id="stage" type="text" value="Germination" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                    <div>
+                        <label class="label">MOI</label>
+                        <input id="moi" type="number" value="3.0" step="0.1" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                    <div>
+                        <label class="label">Temperature</label>
+                        <input id="temp" type="number" value="27.0" step="0.1" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                    <div>
+                        <label class="label">Humidity</label>
+                        <input id="humidity" type="number" value="75.0" step="0.1" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:10px;" />
+                    </div>
+                </div>
+                <button class="button secondary" onclick="runCustomPrediction()" style="margin-top: 12px;">Run custom prediction</button>
+                <p class="message" style="margin-top: 12px;">Fill in the fields above, then run the simplified model2 prediction.</p>
+            </div>
+
+            <div class="result-block" id="demo-result" style="display:none;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                    <div>
+                        <div id="demo-water-needed" style="margin-top: 10px;"></div>
+                    </div>
+                    <span id="demo-badge" class="badge success">Ready</span>
+                </div>
+                <div id="demo-input" style="margin-top: 16px;"></div>
+                <div id="demo-shap" style="margin-top: 16px;"></div>
+                <div id="demo-probabilities" style="display:none; margin-top: 16px;"></div>
+                <div id="demo-features" style="display:none; margin-top: 16px;"></div>
+            </div>
+
+            <div class="result-block" id="demo-error" style="display:none;">
+                <p class="label">Error</p>
+                <div id="demo-error-msg" class="badge error"></div>
+            </div>
+
+            <div class="message">
+                <p>The demo now sends structured values to the simplified model2 prediction route and displays the prediction output.</p>
+                <p><a href="/">Back to main dashboard</a> · <a href="/predict">API docs</a></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        async function runDemo() {
+            const resultEl = document.getElementById('demo-result');
+            const errorEl = document.getElementById('demo-error');
+            const probabilitiesEl = document.getElementById('demo-probabilities');
+            const featuresEl = document.getElementById('demo-features');
+            const errorMsgEl = document.getElementById('demo-error-msg');
+
+            resultEl.style.display = 'none';
+            errorEl.style.display = 'none';
+
+            try {
+                const response = await fetch('/predict/model2/demo');
+                const data = await response.json();
+                if (!response.ok) {
+                    errorMsgEl.textContent = data.error || 'Demo request failed.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('demo-water-needed').innerHTML = data.water_needed ? `<p><strong>${data.water_needed}</strong></p>` : '<p>No water recommendation available.</p>';
+                probabilitiesEl.innerHTML = '';
+                featuresEl.innerHTML = '';
+                resultEl.style.display = 'block';
+                document.getElementById('demo-badge').textContent = 'Success';
+                document.getElementById('demo-badge').className = 'badge success';
+            } catch (error) {
+                errorMsgEl.textContent = error.message || 'Unexpected error.';
+                errorEl.style.display = 'block';
+                document.getElementById('demo-badge').textContent = 'Error';
+                document.getElementById('demo-badge').className = 'badge error';
+            }
+        }
+
+        async function runCustomPrediction() {
+            const resultEl = document.getElementById('demo-result');
+            const errorEl = document.getElementById('demo-error');
+            const demoInputEl = document.getElementById('demo-input');
+            const demoShapEl = document.getElementById('demo-shap');
+            const probabilitiesEl = document.getElementById('demo-probabilities');
+            const featuresEl = document.getElementById('demo-features');
+            const errorMsgEl = document.getElementById('demo-error-msg');
+
+            resultEl.style.display = 'none';
+            errorEl.style.display = 'none';
+
+            const payload = {
+                crop: document.getElementById('crop').value,
+                soil: document.getElementById('soil').value,
+                stage: document.getElementById('stage').value,
+                moi: parseFloat(document.getElementById('moi').value),
+                temp: parseFloat(document.getElementById('temp').value),
+                humidity: parseFloat(document.getElementById('humidity').value),
+            };
+
+            if (Number.isNaN(payload.moi) || Number.isNaN(payload.temp) || Number.isNaN(payload.humidity)) {
+                errorMsgEl.textContent = 'Please enter valid numeric values for MOI, Temperature, and Humidity.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/predict/model2/simple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    errorMsgEl.textContent = data.error || 'Prediction request failed.';
+                    errorEl.style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('demo-water-needed').innerHTML = data.water_needed ? `<p><strong>${data.water_needed}</strong></p>` : '<p>No water recommendation available.</p>';
+                demoInputEl.innerHTML = `<div class="label">Input values</div><pre>${JSON.stringify(data.input, null, 2)}</pre>`;
+                if (data.shap_values) {
+                    demoShapEl.innerHTML = `<div class="label">SHAP feature impacts</div><pre>${JSON.stringify(data.shap_values.slice(0, 8), null, 2)}</pre>`;
+                } else {
+                    demoShapEl.innerHTML = '';
+                }
+                probabilitiesEl.innerHTML = '';
+                featuresEl.innerHTML = '';
+                resultEl.style.display = 'block';
+                document.getElementById('demo-badge').textContent = 'Success';
+                document.getElementById('demo-badge').className = 'badge success';
+            } catch (error) {
+                errorMsgEl.textContent = error.message || 'Unexpected error.';
+                errorEl.style.display = 'block';
+                document.getElementById('demo-badge').textContent = 'Error';
+                document.getElementById('demo-badge').className = 'badge error';
+            }
+        }
+
+    </script>
+</body>
+</html>
